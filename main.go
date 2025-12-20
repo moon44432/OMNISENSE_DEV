@@ -9,9 +9,16 @@ import (
 var hub *Hub
 
 func main() {
-	// WebSocket Hub 초기화
+	// WebSocket Hub 초기화 (for subtitles)
 	hub = newHub()
 	go hub.run()
+	
+	// Video Hub 초기화 (for UDP video streaming)
+	videoHub = newVideoHub()
+	go videoHub.run()
+	
+	// Start UDP video receiver on port 5004
+	go startUDPVideoReceiver(5004)
 
 	// 정적 파일 서버에 캐시 방지 미들웨어 추가
 	fs := http.FileServer(http.Dir("./static"))
@@ -19,6 +26,7 @@ func main() {
 
 	// WebSocket 엔드포인트
 	http.HandleFunc("/ws", handleWebSocket)
+	http.HandleFunc("/ws-video", handleVideoWebSocket)
 
 	// HTTP 엔드포인트
 	http.HandleFunc("/post", handlePost)

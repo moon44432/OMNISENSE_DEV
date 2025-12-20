@@ -40,6 +40,11 @@ window.updateUIForStreamingState = function(streamingActive) {
     }
 
     // 비디오 플레이어를 초기 placeholder 상태로 되돌림
+    // UDP video img element가 있으면 제거
+    const udpVideoImg = document.getElementById('udpVideoFrame');
+    if (udpVideoImg) {
+      udpVideoImg.remove();
+    }
     videoPlayer.innerHTML = `<div class="video-placeholder"><p data-i18n="msg_start_prompt">${window.t('msg_start_prompt')}</p></div>`;
   }
 }

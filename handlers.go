@@ -51,37 +51,28 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		strings.Contains(host, "10.") ||
 		strings.Contains(host, "172.")
 
-	pc, videoTrack, audioTrack, err := initWebRTCSession(&offer, isLocalhost)
+	// WebRTC 세션 초기화 (오디오만)
+	pc, audioTrack, err := initWebRTCSession(&offer, isLocalhost)
 	if err != nil {
 		http.Error(w, "WebRTC failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// UDP 리스너 초기화
-	videoListener, err := initUDPListener("RTP_PORT", 5004, "Video")
-	if err != nil {
-		pc.Close()
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-
+	// 오디오 UDP 리스너만 초기화 (비디오는 별도 UDP -> WebSocket 경로 사용)
 	audioListener, err := initUDPListener("RTP_AUDIO_PORT", 5006, "Audio")
 	if err != nil {
 		pc.Close()
-		videoListener.Close()
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
-	// RTP 전송 시작
-	go sendRtpToClient(videoTrack, videoListener)
+	// RTP 오디오 전송 시작
 	go sendRtpToClient(audioTrack, audioListener)
 
 	// 즉시 정리를 위한 연결 모니터링
 	streamInProgress = true
 	setupPeerConnection(pc, func() {
 		streamInProgress = false
-		videoListener.Close()
 		audioListener.Close()
 		pc.Close()
 		log.Printf("Stream resources cleaned up")

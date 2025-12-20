@@ -13,8 +13,8 @@ import (
 
 // ---------- WebRTC ----------
 
-func initWebRTCSession(offer *webrtc.SessionDescription, isLocalhost bool) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, *webrtc.TrackLocalStaticRTP, error) {
-	log.Printf("Initializing WebRTC session (localhost: %t)", isLocalhost)
+func initWebRTCSession(offer *webrtc.SessionDescription, isLocalhost bool) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
+	log.Printf("Initializing WebRTC session (localhost: %t) - Audio only", isLocalhost)
 
 	// localhost/내부망 접속인 경우 STUN 서버 없이 직접 연결
 	var iceServers []webrtc.ICEServer
@@ -50,52 +50,41 @@ func initWebRTCSession(offer *webrtc.SessionDescription, isLocalhost bool) (*web
 	}
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("NewPeerConnection: %w", err)
+		return nil, nil, fmt.Errorf("NewPeerConnection: %w", err)
 	}
 
-	// 트랙 생성 및 추가
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
-	if err != nil {
-		pc.Close()
-		return nil, nil, nil, fmt.Errorf("video track: %w", err)
-	}
-
+	// 오디오 트랙만 생성 및 추가 (비디오는 UDP로 전송)
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
 		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
 	if err != nil {
 		pc.Close()
-		return nil, nil, nil, fmt.Errorf("audio track: %w", err)
+		return nil, nil, fmt.Errorf("audio track: %w", err)
 	}
 
-	if _, err = pc.AddTrack(videoTrack); err != nil {
-		pc.Close()
-		return nil, nil, nil, fmt.Errorf("add video track: %w", err)
-	}
 	if _, err = pc.AddTrack(audioTrack); err != nil {
 		pc.Close()
-		return nil, nil, nil, fmt.Errorf("add audio track: %w", err)
+		return nil, nil, fmt.Errorf("add audio track: %w", err)
 	}
 
 	// SDP 처리
 	if err := pc.SetRemoteDescription(*offer); err != nil {
 		pc.Close()
-		return nil, nil, nil, fmt.Errorf("SetRemoteDescription: %w", err)
+		return nil, nil, fmt.Errorf("SetRemoteDescription: %w", err)
 	}
 
 	answer, err := pc.CreateAnswer(nil)
 	if err != nil {
 		pc.Close()
-		return nil, nil, nil, fmt.Errorf("CreateAnswer: %w", err)
+		return nil, nil, fmt.Errorf("CreateAnswer: %w", err)
 	}
 	if err := pc.SetLocalDescription(answer); err != nil {
 		pc.Close()
-		return nil, nil, nil, fmt.Errorf("SetLocalDescription: %w", err)
+		return nil, nil, fmt.Errorf("SetLocalDescription: %w", err)
 	}
 
 	// ICE 수집 완료 대기
 	<-webrtc.GatheringCompletePromise(pc)
-	return pc, videoTrack, audioTrack, nil
+	return pc, audioTrack, nil
 }
 
 // ---------- UDP(RTP) ----------

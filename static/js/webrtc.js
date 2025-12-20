@@ -46,18 +46,12 @@ window.initializePeerConnection = function() {
     el.autoplay = true;
     el.controls = false;
 
-    if (event.track.kind === 'video') {
-      const videoPlayer = document.getElementById('remoteVideo');
-      videoPlayer.innerHTML = '';
-      videoPlayer.appendChild(el);
-      el.style.width = '100%';
-      el.style.height = '100%';
-      el.style.objectFit = 'contain';
-    } else {
+    // Only handle audio track - video is now handled by UDP stream
+    if (event.track.kind === 'audio') {
       document.body.appendChild(el);
     }
     
-    updateStreamStatus('스트리밍이 연결되었습니다');
+    updateStreamStatus('오디오 스트림이 연결되었습니다');
   };
 
   newPc.oniceconnectionstatechange = e => {
@@ -115,8 +109,7 @@ window.initializePeerConnection = function() {
     log(`Connection state changed: ${newPc.connectionState}`);
   };
 
-  // Offer to receive both video and audio tracks
-  newPc.addTransceiver('video', {'direction': 'recvonly'});
+  // Offer to receive only audio track (video is now UDP-based)
   newPc.addTransceiver('audio', {'direction': 'recvonly'});
   newPc.createOffer().then(d => newPc.setLocalDescription(d)).catch(log);
 
@@ -129,6 +122,11 @@ window.cleanupWebRTC = function() {
   
   try {
     log('즉시 WebRTC 연결 정리 시작...');
+    
+    // Stop UDP video stream
+    if (window.udpVideoStream) {
+      window.udpVideoStream.stop();
+    }
     
     // 모든 트랙과 미디어 스트림 즉시 정리
     const senders = pc.getSenders();
@@ -214,6 +212,25 @@ window.startStreaming = function() {
   
   if (typeof window.announceToScreenReader === 'function') {
     window.announceToScreenReader(window.t('msg_streaming_start'));
+  }
+  
+  // Start UDP video stream
+  if (window.udpVideoStream) {
+    const videoPlayer = document.getElementById('remoteVideo');
+    if (videoPlayer) {
+      // Clear placeholder and create img element for UDP video
+      videoPlayer.innerHTML = '';
+      const videoImg = document.createElement('img');
+      videoImg.id = 'udpVideoFrame';
+      videoImg.style.width = '100%';
+      videoImg.style.height = '100%';
+      videoImg.style.objectFit = 'contain';
+      videoImg.style.display = 'none'; // Hidden until first frame arrives
+      videoPlayer.appendChild(videoImg);
+      
+      window.udpVideoStream.start(videoImg);
+      window.log('UDP video stream initialized');
+    }
   }
   
   // ICE 후보 수집이 완료될 때까지 대기
